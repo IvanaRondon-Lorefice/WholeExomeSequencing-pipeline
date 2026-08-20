@@ -6,14 +6,14 @@
 
 #----------------------------------- MUTECT2 ----------------------------------
 
-# Variant calling is the process of identifying genetic variations, such as single nucleotide polymorphisms (SNPs), 
-# insertions, deletions, and structural variants, from DNA sequencing data. It is a crucial step in genomic analysis, 
-# providing insights into genetic differences between individuals and populations. Mutect2, developed by the Broad Institute, 
-# is a widely used tool for somatic variant calling in cancer genomics. It is specifically designed to identify somatic 
-# mutations in tumor-normal paired samples with high sensitivity and specificity, making it ideal for detecting low-frequency 
-# variants in complex tumor genomes. Mutect2's sophisticated algorithms and advanced filtering strategies enable accurate 
-# identification of somatic mutations, helping researchers and clinicians unravel the genetic basis of cancer and guide 
-# personalized treatment decisions.
+#| Variant calling is the process of identifying genetic variations, such as single nucleotide polymorphisms (SNPs), 
+#| insertions, deletions, and structural variants, from DNA sequencing data. It is a crucial step in genomic analysis, 
+#| providing insights into genetic differences between individuals and populations. Mutect2, developed by the Broad Institute, 
+#| is a widely used tool for somatic variant calling in cancer genomics. It is specifically designed to identify somatic 
+#| mutations in tumor-normal paired samples with high sensitivity and specificity, making it ideal for detecting low-frequency 
+#| variants in complex tumor genomes. Mutect2's sophisticated algorithms and advanced filtering strategies enable accurate 
+#| identification of somatic mutations, helping researchers and clinicians unravel the genetic basis of cancer and guide 
+#| personalized treatment decisions.
 
 #------------------------------------------------------------------------------
 
@@ -28,7 +28,7 @@
 conf_env <- "../00_conf_env.env"
 
 # Loading necessary libraries and data
-.libPaths("/vols/GPArkaitz_bigdata/irondon/R_libraries")
+.libPaths("../R_libraries")
 library("dotenv")
 load_dot_env(file = conf_env)  # Carga las variables del archivo .env
 

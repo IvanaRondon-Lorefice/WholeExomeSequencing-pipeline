@@ -1,11 +1,13 @@
 ################################################################################
-# ANNOTATING SNVs FOUND IN WES DATA OF PROJECT AC-82_WESmouse_pipeline
+# ANNOTATING SNVs FOUND IN WES DATA 
 ################################################################################
 
-#| Description
+#| This script processes and prioritizes somatic SNVs identified from WES data.
+#| It integrates Mutect2/BCFtools metrics with VEP functional annotations,
+#| filters variants by quality and predicted impact, and generates summary
+#| tables and visualizations including allele-frequency plots and oncoplots.
 
 ################################################################################
-
 
 
 
@@ -33,26 +35,22 @@ suppressMessages(library(patchwork))
 suppressMessages(library(maftools))
 suppressMessages(library(biomaRt))
 suppressMessages(library(tidyverse))
-suppressMessages(library(dotenv))
 
 #| For plots
 theme_set(theme_classic())
 
 #| Setting working dir
-setwd("X:/irondon/AC-82_WESmouse_pipeline")
-
-# Configuration env file
-load_dot_env(file = "00_conf_env.env") 
+setwd("path/dir")
 
 #| Dataset from ensembl
-genome <- Sys.getenv("DATASET_ENSEMBL")
-version <- as.numeric(Sys.getenv("VERSION_ENSEMBL"))
+genome <- "mmusculus_gene_ensembl"
+version <- 102
 
 #| Tumor directory
-tumour_dir <- paste0(Sys.getenv("R_BASE_DIR"),Sys.getenv("TUMOR_PON_DIR"))
+tumour_dir <- "path/tumor_dir"
 
 #| Directory Results
-dir.results <- paste0(Sys.getenv("R_BASE_DIR"),Sys.getenv("TUMOR_PON_ANNOTATIONS_DIR"), "Results/")
+dir.results <- "path/results_dir"
 
 #| Creating necessary folders
 dir.create(dir.results)
@@ -69,11 +67,6 @@ annotations$CONTIG <- paste("chr",annotations$CONTIG, sep ="")
 
 #| Custom background for enrichment analysis
 custom_bg <- unique(annotations$gene_name[which(annotations$gene_type == "protein_coding")])
-
-#| Sample information
-sample_info <- read_xlsx("X:/irondon/AC-82_WESmouse/Info_mouse.xlsx")
-sample_info$Samples <- NA
-sample_info$Samples <- paste0("Sample_", sample_info$`Tube ID`)
 ################################################################################
 
 
@@ -209,7 +202,7 @@ if( !is.na(unique(sample_metric$V10)[2]) ){
   
   #| Separating data: UNIQUE ALLELES
   values_unique <- values[which(!(duplicated(values$POS) | duplicated(values$POS, fromLast = TRUE) )), ]
-  values_unique <- values_unique[,c("CHR","POS","REF", "ALT","AD", "AF", "DP", "MMQ", "MPOS","P_GERMLINE", "TLOD")]
+  values_unique <- values_unique[,c("POS","REF", "ALT","AD", "AF", "DP", "MMQ", "MPOS","P_GERMLINE", "TLOD")]
   
 }else{
   
@@ -237,7 +230,7 @@ if( !is.na(unique(sample_metric$V10)[2]) ){
   
   #| Separating data: UNIQUE ALLELES
   values_unique <- values[which(!(duplicated(values$POS) | duplicated(values$POS, fromLast = TRUE) )), ]
-  values_unique <- values_unique[,c("CHR","POS","REF", "ALT","AD", "AF", "DP", "MMQ", "MPOS","P_GERMLINE", "TLOD")]
+  values_unique <- values_unique[,c("POS","REF", "ALT","AD", "AF", "DP", "MMQ", "MPOS","P_GERMLINE", "TLOD")]
   
 }
 
@@ -258,6 +251,7 @@ ensembl_results_unique$POS <- do.call(rbind,strsplit(do.call(rbind, strsplit(ens
 
 values_unique <- merge(values_unique, ensembl_results_unique, by = "POS")
 values_unique_list[[Samples[i]]] <- values_unique
+
 
 for (i in 2:length(Samples)){
   
@@ -341,7 +335,7 @@ for (i in 2:length(Samples)){
     
     #| Separating data: UNIQUE ALLELES
     values_unique <- values[which(!(duplicated(values$POS) | duplicated(values$POS, fromLast = TRUE) )), ]
-    values_unique <- values_unique[,c("CHR","POS","REF", "ALT","AD", "AF", "DP", "MMQ", "MPOS","P_GERMLINE", "TLOD")]
+    values_unique <- values_unique[,c("POS","REF", "ALT","AD", "AF", "DP", "MMQ", "MPOS","P_GERMLINE", "TLOD")]
     
   }else{
     
@@ -369,7 +363,7 @@ for (i in 2:length(Samples)){
     
     #| Separating data: UNIQUE ALLELES
     values_unique <- values[which(!(duplicated(values$POS) | duplicated(values$POS, fromLast = TRUE) )), ]
-    values_unique <- values_unique[,c("CHR","POS","REF", "ALT","AD", "AF", "DP", "MMQ", "MPOS","P_GERMLINE", "TLOD")]
+    values_unique <- values_unique[,c("POS","REF", "ALT","AD", "AF", "DP", "MMQ", "MPOS","P_GERMLINE", "TLOD")]
     
   }
   
@@ -427,28 +421,23 @@ values_unique_df <- values_unique_df %>%
   slice(1) %>%  # This ensures only one row is kept if ties exist
   ungroup()
 
-values_unique_df[which(values_unique_df$SYMBOL == "Psg23"),c("Samples", "SYMBOL", "POS", "AF")]
+values_unique_df[which(values_unique_df$SYMBOL == "Psg23"),]
 
 #| If a gene have several mutations, retain de most consequential 
-values_unique_df <- values_unique_df %>%
+values_unique_df_3 <- values_unique_df %>%
   group_by(Samples, SYMBOL) %>%
   filter(Impact_Rank == max(Impact_Rank)) %>%
   slice(1) %>%  # This ensures only one row is kept if ties exist
   ungroup()
 
-values_unique_df[which(values_unique_df$SYMBOL == "Psg23"),c("Samples", "SYMBOL", "POS")]
-
-
-#| Adding mouse information
-values_unique_df<- merge(values_unique_df,sample_info, by ="Samples" )
-values_unique_df$Age <- gsub("M", "", values_unique_df$Age)
-values_unique_df$Age <- as.numeric(values_unique_df$Age)
+#| Additional filtering
+values_unique_df <- values_unique_df[which( (values_unique_df$AF > 0.01) & (values_unique_df$MMQ >30) & (values_unique_df$MPOS >20 ) & (values_unique_df$DP > 20) ),]
 
 #| Saving results
 writexl::write_xlsx(values_unique_df, paste0(dir.results, "values_unique_results.xlsx"))
 
 #| Allele frequencing distribution
-p <- ggplot(values_unique_df, aes(x = Samples, y = AF, fill =Samples)) +
+ggplot(values_unique_df, aes(x = Samples, y = AF, fill =Samples)) +
   geom_violin(trim=FALSE) +
   stat_summary(fun.data=mean_sdl, mult=1, 
                geom="pointrange", color="black") +
@@ -457,10 +446,7 @@ p <- ggplot(values_unique_df, aes(x = Samples, y = AF, fill =Samples)) +
         axis.text.y = element_text(size =12, color ="black"),
         legend.position = "none")+
   scale_fill_manual(values = rainbow(21))
-means <- aggregate(AF  ~ Samples + DOB, values_unique_df, mean)
-p + geom_text(data = means, aes(x = reorder(Samples, DOB), label = DOB), # Adjust y for spacing
-              hjust = -1,vjust=-1, size = 3.3,angle = 90 )
-ggsave(paste0(dir.results,"Violin_plots/AF_Samples_Protein_Coding_First_Priorization.pdf"), height = 4.5, width = 8)
+ggsave(paste0(dir.results,"Violin_plots/AF_Samples_Protein_Coding_First_Priorization"), height = 4.5, width = 8)
 
 
 ################################################################################
@@ -472,13 +458,7 @@ ggsave(paste0(dir.results,"Violin_plots/AF_Samples_Protein_Coding_First_Prioriza
 #|      * Selecting only HIGH impact mutations
 ################################################################################
 
-values_unique_df <- read_xlsx(paste0(dir.results, "values_unique_results.xlsx"))
-
-values_unique_df <- values_unique_df[which(values_unique_df$DP > 20),]
-values_unique_df <- values_unique_df[which(values_unique_df$AF > 0.005),]
-values_unique_df <- values_unique_df[which(values_unique_df$MMQ > 30),]
-values_unique_df <- values_unique_df[which(values_unique_df$MPOS >20),]
-min(values_unique_df$DP)
+values_unique_df <- read_xlsx("Results/values_unique_results.xlsx")
 
 filtered_mutations <- values_unique_df[which( (values_unique_df$BIOTYPE == "protein_coding") ),]
 
@@ -496,20 +476,19 @@ filtered_mutations <- filtered_mutations[which( (filtered_mutations$Consequence 
                                                   (filtered_mutations$Consequence == "splice_acceptor_variant")  ), ] 
 
 #| Filtering mutations appearing with the same position across sample and selecting the more consequential
-filtered_mutations <- filtered_mutations %>%
-  group_by(POS) %>%
-  mutate(sample_count = n_distinct(Samples)) %>%
-  dplyr::filter(sample_count <= 2) %>%
-  ungroup()
+#filtered_mutations <- filtered_mutations %>%
+#  group_by(POS) %>%
+#  mutate(sample_count = n_distinct(Samples)) %>%
+#  dplyr::filter(sample_count <= 1) %>%
+#  ungroup()
 
-filtered_mutations_df <- filtered_mutations[,c("Samples", "POS", "SYMBOL", "AF", "DP", "MMQ", "MPOS", "Consequence", "IMPACT", "sample_count","DOB")]
+filtered_mutations_df <- filtered_mutations[,c("Samples", "POS", "SYMBOL", "AF", "DP", "MMQ", "MPOS", "Consequence", "IMPACT")]
 
 filtered_mutations_df <- filtered_mutations_df[which(!is.na(filtered_mutations_df$Samples)),]
 
-filtered_mutations_df[which(filtered_mutations_df$SYMBOL == "Psg23"),]
 
 #| Allele frequency
-p <- ggplot(filtered_mutations_df, aes(x = reorder(Samples,AF), y = AF, fill =Samples)) +
+ggplot(filtered_mutations_df, aes(x = Samples, y = AF, fill =Samples)) +
   geom_violin(trim=FALSE) +
   stat_summary(fun.data=mean_sdl, mult=1, 
                geom="pointrange", color="black") +
@@ -517,15 +496,19 @@ p <- ggplot(filtered_mutations_df, aes(x = reorder(Samples,AF), y = AF, fill =Sa
         axis.text.x = element_text(size =12, angle = 60, hjust=1, color ="black"),
         axis.text.y = element_text(size =12, color ="black"),
         legend.position = "none")+
-  scale_fill_manual(values = rainbow(21))+
-  geom_hline(yintercept = 0.5, color ="black")
-means <- aggregate(AF  ~ Samples + DOB, filtered_mutations_df, mean)
-p + geom_text(data = means, aes(x = reorder(Samples, DOB), label = DOB), # Adjust y for spacing
-              hjust = -1,vjust=-1, size = 3.3,angle = 90 )
-
+  scale_fill_manual(values = rainbow(21))
 ggsave(paste0(dir.results,"Violin_plots/AF_Samples_Protein_Coding_Second_Priorization.pdf"), height = 4.5, width = 8)
 
-filtered_mutations_df <- filtered_mutations_df[which(filtered_mutations_df$AF < 0.35),]
+#| Histogram of DP
+ggplot(filtered_mutations_df, aes(x = DP))+
+  geom_histogram(binwidth=1, color = "black")+
+  theme(text=element_text(size=14,  family="sans"),
+        axis.text.x = element_text(size = 12, family = "sans"),
+        axis.text.y = element_text(size = 12, family = "sans")) +
+  ylab("Counts")+
+  xlab("Depth")
+
+filtered_mutations_df[which(filtered_mutations_df$Samples == "338"),]
 
 
 #############| BAR PLOT CONSEQUENCE
@@ -544,12 +527,8 @@ ggplot(filtered_mutations_df_plot, aes(x = fct_infreq(Samples), fill =Consequenc
   scale_fill_manual(values = rainbow(7))+
   xlab("Samples") +
   ylab("Mutations")
-ggsave(paste0(dir.results,"Bar_plots/Barplot_Protein-Coding.pdf"), height = 4.5, width = 8)
+ggsave(paste0(dir.results,"Bar_plots/Barplot_Protein-Coding.pdf"), height = 4.5, width = 4)
 
-
-filtered_mutations_df_plot[which(filtered_mutations_df_plot$SYMBOL == "Kdm6b"),]
-filtered_mutations_df_plot[which(filtered_mutations_df_plot$SYMBOL == "Cdk8"),]
-unique(filtered_mutations_df_plot$SYMBOL[which(filtered_mutations_df_plot$sample_count ==2)])
 
 #############| ONCOPLOT
 #| Transforming the names of the variants
@@ -594,7 +573,7 @@ maf_df <- filtered_mutations_df %>%
   )
 
 #| DEFINING COLORS
-vc_cols = RColorBrewer::brewer.pal(n = 8, name = 'Set2')
+vc_cols = RColorBrewer::brewer.pal(n = 8, name = 'Spectral')
 names(vc_cols) = c(
   'Missense_Mutation',
   'Multi_Hit',
@@ -635,16 +614,15 @@ for (sheet_name in names(data_list)) {
 saveWorkbook(wb,  paste0(dir.results,"Gene_Mutations_Summary.xlsx"), overwrite = TRUE)
 
 #| INCLUDING ALLELE FREQUENCY
-genes <- rownames(maf_data_df)[which(maf_data_df$MutatedSamples >=2)]
+genes <- rownames(maf_data_df)[which(maf_data_df$MutatedSamples >=1)]
 maf_data@gene.summary$Hugo_Symbol
 aml_genes <- maf_data@gene.summary$Hugo_Symbol[c(1:length(genes))]
 aml_genes_vaf = subsetMaf(maf = maf_data, 
                           genes = aml_genes, 
                           fields = "VAF", mafObj = FALSE)[,mean(VAF, na.rm = TRUE), Hugo_Symbol]
-
 colnames(aml_genes_vaf)[2] = "VAF"
 
-pdf(paste0(dir.results,"Oncoplots/Oncoplots_Protein-Coding.pdf"), height = 4, width = 5)
+pdf(paste0(dir.results,"Oncoplots/Oncoplots_Protein-Coding_Mut-1Mice_Multi-hit.pdf"), height = 5.6, width = 5)
 oncoplot(
   maf = maf_data,
   genes = aml_genes,
@@ -657,124 +635,4 @@ oncoplot(
   fontSize  = 0.5
 )
 dev.off()
-
-
-#############| ENRICHMENT
-#|      * ALL mutations
-total_gost<- gost(list("Genes with mutations" = rownames(maf_data_df)[which(maf_data_df$MutatedSamples >=1)]), 
-                  organism = "mmusculus", 
-                  ordered_query = FALSE, 
-                  multi_query = FALSE, 
-                  significant = TRUE, 
-                  exclude_iea = FALSE,
-                  measure_underrepresentation = FALSE, 
-                  evcodes = TRUE,
-                  user_threshold = 0.05, 
-                  correction_method = "fdr",
-                  domain_scope = "custom", 
-                  custom_bg =custom_bg,
-                  numeric_ns = "", 
-                  sources = NULL, 
-                  as_short_link = FALSE)
-gostplot(total_gost, interactive = FALSE, capped =FALSE)
-
-results <- total_gost$result[order(total_gost$result$p_value),]
-results$`Term name` <- paste(results$term_name, "\n (N = ",results$term_size, ")",sep ="")
-
-ggplot(results[1:10,], aes(x = reorder(source, -p_value), y = reorder(`Term name`, -p_value))) + 
-  geom_point(aes(size = intersection_size, fill = p_value), alpha = 0.75, shape = 21) +
-  theme(text=element_text(size=14,  family="sans"), 
-        axis.text.x = element_text(size = 12, color ="black"),
-        axis.text.y = element_text(size = 12, color ="black")) +
-  scale_fill_continuous_sequential(palette = "ag_GrnYl") +
-  labs(fill= "p value") +
-  labs(color ="Module size") +
-  labs(size= "Intersection size")+
-  xlab("Data") +
-  ylab("Term name")
-
-
-#############| ENRICHMENT
-#|      * ALL mutations in the subset
-subset <- c("Sample_9","Sample_5","Sample_4","Sample_14","Sample_8","Sample_2","Sample_7","Sample_17","Sample_25")
-filtered_mutations_df_subset <- filtered_mutations_df[which(filtered_mutations_df$Samples %in% subset),]
-maf_df <- filtered_mutations_df_subset %>%
-  mutate(
-    Tumor_Sample_Barcode = Samples,        # Map sample names
-    Hugo_Symbol = SYMBOL,                  # Map gene names
-    Chromosome = "Unknown",                # Placeholder if chromosome not available
-    Start_Position = POS,                  # Use POS as start
-    End_Position = POS,                    # Use POS as end for single-base mutations
-    VAF = AF,
-    Variant_Classification = Consequence_maftools,
-    Variant_Type = "SNV",                  # Placeholder for mutation type
-    Reference_Allele = "-",                # Placeholder if data not available
-    Tumor_Seq_Allele2 = "-",               # Placeholder if data not available
-    Protein_Change = NA_character_         # Placeholder if not available
-  ) %>%
-  dplyr::select(
-    Tumor_Sample_Barcode, 
-    Hugo_Symbol, Chromosome, Start_Position, End_Position,VAF,
-    Variant_Classification, Variant_Type, Reference_Allele, Tumor_Seq_Allele2, Protein_Change
-  )
-
-#| DEFINING COLORS
-vc_cols = RColorBrewer::brewer.pal(n = 8, name = 'Set2')
-names(vc_cols) = c(
-  'Missense_Mutation',
-  'Multi_Hit',
-  'Frame_Shift_Ins',
-  'In_Frame_Ins',
-  'Frame_Shift_Del',
-  'Splice_Site',
-  'In_Frame_Del',
-  'Nonsense_Mutation'
-)
-
-maf_data <- read.maf(maf = maf_df)
-maf_data_df <- as.data.frame(maf_data@gene.summary)
-rownames(maf_data_df) <- maf_data_df$Hugo_Symbol
-maf_data_df <- maf_data_df[,-c(1)]
-
-#| INCLUDING ALLELE FREQUENCY
-genes <- rownames(maf_data_df)[which(maf_data_df$MutatedSamples >=2)]
-maf_data@gene.summary$Hugo_Symbol
-aml_genes <- maf_data@gene.summary$Hugo_Symbol[c(1:length(genes))]
-aml_genes_vaf = subsetMaf(maf = maf_data, 
-                          genes = aml_genes, 
-                          fields = "VAF", mafObj = FALSE)[,mean(VAF, na.rm = TRUE), Hugo_Symbol]
-
-colnames(aml_genes_vaf)[2] = "VAF"
-rownames(maf_data_df)[which(maf_data_df$AlteredSamples >=1)]
-
-total_gost<- gost(list("Genes with mutations" = rownames(maf_data_df)[which(maf_data_df$MutatedSamples >=1)]), 
-                  organism = "mmusculus", 
-                  ordered_query = FALSE, 
-                  multi_query = FALSE, 
-                  significant = TRUE, 
-                  exclude_iea = FALSE,
-                  measure_underrepresentation = FALSE, 
-                  evcodes = TRUE,
-                  user_threshold = 0.05, 
-                  correction_method = "fdr",
-                  domain_scope = "custom", 
-                  custom_bg =custom_bg,
-                  numeric_ns = "", 
-                  sources = NULL, 
-                  as_short_link = FALSE)
-gostplot(total_gost, interactive = FALSE, capped =FALSE)
-
-results <- total_gost$result[order(total_gost$result$p_value),]
-results$`Term name` <- paste(results$term_name, "\n (N = ",results$term_size, ")",sep ="")
-ggplot(results[1:15,], aes(x = reorder(source, -p_value), y = reorder(`Term name`, -p_value))) + 
-  geom_point(aes(size = intersection_size, fill = p_value), alpha = 0.75, shape = 21) +
-  theme(text=element_text(size=14,  family="sans"), 
-        axis.text.x = element_text(size = 12, color ="black"),
-        axis.text.y = element_text(size = 12, color ="black")) +
-  scale_fill_continuous_sequential(palette = "ag_GrnYl") +
-  labs(fill= "p value") +
-  labs(color ="Module size") +
-  labs(size= "Intersection size")+
-  xlab("Data") +
-  ylab("Term name")
 ################################################################################

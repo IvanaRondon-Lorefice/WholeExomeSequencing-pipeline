@@ -131,7 +131,7 @@ suppressMessages(library(dotenv))
 theme_set(theme_classic())
 
 #| Setting working dir
-setwd("X:/irondon/AC-82_WESmouse_pipeline/04_CNAs_CODEX2/")
+setwd("../")
 
 # Configuration env file
 load_dot_env(file = "../00_conf_env.env") 

@@ -135,7 +135,7 @@ for (sample in samples){
 # STATISTICS FROM DUPLICATES
 ################################################################################
 
-duplicates <- readLines(paste0(dup_metrics_dir,"marked_dup_metrics_332.txt"))
+duplicates <- readLines(paste0(dup_metrics_dir,"marked_dup_metrics.txt"))
 col_names <- duplicates[7]
 dup_dataframe <- data.frame(row.names = unlist(strsplit(col_names, split = "\t")))
 
