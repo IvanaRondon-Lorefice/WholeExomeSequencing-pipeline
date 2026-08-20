@@ -19,7 +19,7 @@ suppressMessages(library(data.table))
 suppressMessages(library(ggplot2))
 
 #| Setting working dir
-setwd("X:/irondon/AC-82_WESmouse_pipeline")
+setwd("../irondon/")
 
 # Configuration env file
 load_dot_env(file = "00_conf_env.env") 
