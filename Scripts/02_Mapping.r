@@ -84,7 +84,7 @@
 conf_env <- "../00_conf_env.env"
 
 # Loading necessary libraries and data
-.libPaths("/vols/GPArkaitz_bigdata/irondon/R_libraries")
+.libPaths("../R_libraries")
 library("dotenv")
 load_dot_env(file = conf_env)  # Loading variables from .env file
 
